@@ -1,0 +1,12 @@
+BEGIN:VCARD
+VERSION:3.0
+PRODID:-//Sabre//Sabre VObject 4.5.4//EN
+UID:8e5b2f3a-1c4d-4e7a-9b1f-000000000001
+FN:Marie Martin
+N:Martin;Marie;;;
+TEL;TYPE=CELL:+33 6 00 00 00 01
+EMAIL;TYPE=HOME:marie@example.com
+ADR;TYPE=HOME:;;1 rue de l\, Exemple;Paris;;75000;France
+BDAY:1992-04-12
+NOTE:Ne doit jamais sortir du conteneur
+END:VCARD

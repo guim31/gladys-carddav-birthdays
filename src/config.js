@@ -1,45 +1,93 @@
 // -----------------------------------------------------------------------------
-// Integration configuration.
-//
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// Settings. The admin `config_schema` holds what applies to everyone (how
+// often the address books are read, when the reminders fire, the language of
+// the scene texts); each user's `account_schema` holds their CardDAV account.
+// Defaults mirror the manifest (test/manifest.test.js).
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
+import { createHash } from 'node:crypto';
+
+export const LANGUAGES = ['en', 'fr', 'de', 'es'];
+export const SYNC_HOURS = ['1', '6', '24'];
+export const NOTIFY_HOURS = ['7', '8', '9', '10', '12', '18'];
+
 export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
+  sync_hours: '6',
+  notify_hour: '8',
+  language: 'fr',
 };
 
-/**
- * Merge the user config with the defaults.
- * @param {Record<string, unknown>} raw config returned by the SDK
- */
+export const ACCOUNT_DEFAULTS = {
+  server_url: '',
+  username: '',
+  password: '',
+  address_books: '',
+  anniversaries: false,
+  show_age: true,
+};
+
+/** The admin settings, with defaults for anything missing or unknown. */
 export function normalizeConfig(raw = {}) {
-  return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
+  const config = { ...DEFAULT_CONFIG };
+  if (SYNC_HOURS.includes(String(raw?.sync_hours))) {
+    config.sync_hours = String(raw.sync_hours);
+  }
+  if (NOTIFY_HOURS.includes(String(raw?.notify_hour))) {
+    config.notify_hour = String(raw.notify_hour);
+  }
+  if (LANGUAGES.includes(raw?.language)) {
+    config.language = raw.language;
+  }
+  return config;
+}
+
+const bool = (value, fallback) => {
+  if (value === true || value === 'true' || value === 1 || value === '1') {
+    return true;
+  }
+  if (value === false || value === 'false' || value === 0 || value === '0') {
+    return false;
+  }
+  return fallback;
+};
+
+/** Lowercase, without accents nor extra blanks: "Carnet  Pro" matches "carnet pro". */
+export function fold(text) {
+  return String(text ?? '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** One user's account values (`getCalendarAccounts()[].config`). */
+export function parseAccount(values = {}) {
+  const account = {
+    serverUrl: String(values?.server_url ?? '').trim(),
+    username: String(values?.username ?? '').trim(),
+    password: String(values?.password ?? ''),
+    addressBooks: String(values?.address_books ?? '')
+      .split(/[,;\n]/)
+      .map(fold)
+      .filter(Boolean),
+    anniversaries: bool(values?.anniversaries, ACCOUNT_DEFAULTS.anniversaries),
+    showAge: bool(values?.show_age, ACCOUNT_DEFAULTS.show_age),
   };
+  // What identifies the source of the contacts: a change empties the cache.
+  // The password enters as a hash only, the fingerprint is never logged.
+  account.fingerprint = createHash('sha256')
+    .update(
+      JSON.stringify([account.serverUrl, account.username, account.password, account.addressBooks]),
+    )
+    .digest('hex');
+  return account;
+}
+
+/** A supported language, else the fallback. */
+export function languageOf(value, fallback = DEFAULT_CONFIG.language) {
+  const short = String(value ?? '')
+    .slice(0, 2)
+    .toLowerCase();
+  return LANGUAGES.includes(short) ? short : fallback;
 }

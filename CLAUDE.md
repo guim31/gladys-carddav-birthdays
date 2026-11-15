@@ -9,15 +9,19 @@ A Gladys Assistant **external integration**: a Node.js service (Node 22+, ESM,
 no build step) that runs in its own sandboxed Docker container and talks to
 Gladys through
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
-its only runtime dependency. It started from the official JavaScript template.
+and [`fast-xml-parser`](https://github.com/NaturalIntelligence/fast-xml-parser)
+(WebDAV answers), its only runtime dependencies. It is a `calendar`-type
+integration (Gladys 5.2.0+): it reads each user's CardDAV address book and
+pushes their contacts' birthdays into the core calendar store. It started from
+the official JavaScript template.
 
 ## Commands
 
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/sync.test.js             # one file
+node --test --test-name-pattern "Digest"  # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
@@ -31,16 +35,23 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
-src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+index.js                          SDK wiring only: src/app.js registers the handlers before connect()
+src/app.js                        every SDK handler, periodic reading, daily slide, reminder clock
+src/syncer.js                     per user: read the contacts, write calendars and windows of events
+src/contacts.js                   per user cache (name + dates only), ctag/etag change detection
+src/carddav.js                    CardDAV client: discovery, PROPFIND/REPORT, Basic/Digest, errors
+src/vcard.js                      vCard 3.0/4.0 reading: display name, BDAY, ANNIVERSARY (pure)
+src/birthdays.js                  occurrences, next dates, 500-event chunks (pure)
+src/config.js                     DEFAULT_CONFIG (mirrors the manifest), account fields
+src/scenes.js                     scene trigger "birthday_reminder", scene action "next_birthday"
+src/widgets.js                    dashboard widget "birthdays"
+src/i18n.js                       every text of the code, en/fr/de/es
+src/time.js                       local-date arithmetic in TZ
+gladys-assistant-integration.json manifest: config_schema, account_schema, scenes, widget
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (same sections)
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+test/helpers/world.js             fake Gladys + replayed Radicale + settable clock, TZ=Europe/Paris
+test/fixtures/                    real vCards, a recorded Radicale session (192.0.2.10, fake data)
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +81,9 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German and Spanish: event
+  names, calendar descriptions, widget and scene texts, manifest texts, and
+  `docs/{en,fr,de,es}.md` with the same sections. `test/i18n.test.js` checks it.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -251,3 +263,34 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Pièges et choix de cette intégration (CardDAV Birthdays)
+
+- Type `calendar`, comme `gladys-cycles` (contrat : `capabilities/calendar-type.md` du cœur, « Calendar
+  providers » du README du SDK). **Pas d'appareil possible** : le « prochain anniversaire » passe par
+  l'action `next_birthday`, le déclencheur et le widget, qui ne lisent que les calendriers **partagés**.
+- Compte par utilisateur (`account_schema`) : adresse, identifiant, mot de passe `secret`. Les
+  identifiants ne partent que vers l'hôte configuré ou un hôte du même domaine (iCloud répond depuis
+  `pNN-contacts.icloud.com`) ; une redirection ailleurs est refusée. Redirections suivies à la main
+  (`redirect: 'manual'`) pour garder le `PROPFIND` et l'en-tête d'authentification.
+- Découverte : `.well-known/carddav` si l'adresse est nue (Radicale y répond 301 vers `/`), puis
+  `current-user-principal` → `addressbook-home-set` → collections `addressbook`. Une adresse de carnet
+  sert telle quelle. Baïkal demande Digest par défaut : réponse au défi 401 (MD5, `qop=auth`).
+- Changements : `getctag` (ou `sync-token`) inchangé → rien n'est relu ; sinon un `PROPFIND` des etags et un
+  `addressbook-multiget` des seules cartes nouvelles ou modifiées. Le multiget ne garde que les cartes
+  demandées. Cache **en mémoire** : nom + dates + hash de l'UID, rien d'autre ; un redémarrage relit tout.
+- Ids : calendrier `<user>:birthday` / `<user>:anniversary`, événement
+  `<user>:<kind>:<sha256(UID) sur 16>:<année>`. Une date corrigée garde l'id (même année) : déplacée.
+- Fenêtre d'une semaine en arrière à 12 mois devant, événements sur la journée (`'YYYY-MM-DD'`, fin
+  exclusive). Plus de 500 événements : sous-fenêtres disjointes coupées entre deux jours
+  (`chunkByDate`). Rien n'est réécrit si le contenu (hash) n'a pas changé ; tout est réécrit une fois à
+  chaque connexion. Glissement quotidien à 00:05 **sans relire** le serveur (`fetch: false`).
+- 29 février fêté le 28 les années communes. Année < 1901 ou égale à `X-APPLE-OMIT-YEAR` : sans âge.
+  Pas d'occurrence l'année de naissance (pas de « 0 an »).
+- Erreur de lecture : la description du calendrier dit pourquoi (traduite), les événements restent
+  (cache), un avertissement au premier échec et une ligne au retour. Le cœur limite la description à 500.
+- Rappels : un minuteur de 30 s ; une fois par jour à l'heure choisie (`notify_hour`), un événement par
+  date à 0, 1, 2, 3, 7, 14 ou 30 jours ; la date du dernier envoi est gardée dans `/data/state.json`
+  (pas de doublon au redémarrage) ; heure dépassée de plus d'une heure : sautée.
+- Google Contacts : CardDAV en OAuth seulement, non pris en charge (le dire, ne pas le promettre).
+- Testée contre Radicale (`tomsquest/docker-radicale`) en Docker ; Nextcloud, iCloud, Baïkal non essayés.

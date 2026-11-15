@@ -30,6 +30,18 @@ Gladys before reporting a problem.
 
 In scope: the code of this repository and the Docker image it publishes.
 
+- **Secrets**: each user's CardDAV server address, user name and password are
+  stored by Gladys (account values of the calendar integration) and handed to
+  the container in memory. The integration never logs them, never writes them
+  to disk, and sends the credentials only to the configured host or to a host
+  of the same domain (a redirect elsewhere is refused).
+- **Data**: only the display name and the dates of the contacts are kept, in
+  memory; they are pushed to the Gladys calendar of their owner. `/data` holds
+  one file, the date of the last scene reminders.
+- **Network**: outgoing HTTP(S) requests to the CardDAV servers configured by
+  the users (WebDAV `PROPFIND` and `REPORT`, read only), and to the Gladys
+  host API. No port is opened.
+
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and the CardDAV servers the integration talks to.

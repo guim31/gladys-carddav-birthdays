@@ -1,177 +1,800 @@
 {
   "manifest_version": 1,
-  "type": "device",
-  "name": "Demo Devices Template",
+  "type": "calendar",
+  "name": "CardDAV Birthdays",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Your contacts' birthdays from a CardDAV address book (Nextcloud, iCloud…) in Gladys's calendar.",
+    "fr": "Les anniversaires de vos contacts CardDAV (Nextcloud, iCloud…) dans le calendrier de Gladys.",
+    "de": "Die Geburtstage deiner CardDAV-Kontakte (Nextcloud, iCloud…) im Kalender von Gladys.",
+    "es": "Los cumpleaños de sus contactos CardDAV (Nextcloud, iCloud…) en el calendario de Gladys."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-carddav-birthdays:1.0.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-carddav-birthdays/main/cover.png",
+  "categories": ["services"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
-      "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+      "label": {
+        "en": "How it works",
+        "fr": "Fonctionnement",
+        "de": "So funktioniert es",
+        "es": "Funcionamiento"
       },
-      "links": [
+      "description": {
+        "en": "Each user connects their own address book in \"My calendars\" below, and gets a Birthdays calendar. Only the name and the dates of a contact are read. These settings apply to everyone.",
+        "fr": "Chaque utilisateur connecte son propre carnet d'adresses dans « Mes calendriers » ci-dessous, et obtient un calendrier Anniversaires. Seuls le nom et les dates d'un contact sont lus. Ces réglages valent pour tous.",
+        "de": "Jeder Benutzer verbindet unten unter „Meine Kalender“ sein eigenes Adressbuch und erhält einen Geburtstagskalender. Nur Name und Daten eines Kontakts werden gelesen. Diese Einstellungen gelten für alle.",
+        "es": "Cada usuario conecta su propia libreta de direcciones en «Mis calendarios» abajo y obtiene un calendario de cumpleaños. Solo se leen el nombre y las fechas de un contacto. Estos ajustes valen para todos."
+      }
+    },
+    {
+      "key": "sync_hours",
+      "type": "select",
+      "label": {
+        "en": "Read the address books",
+        "fr": "Lire les carnets d'adresses",
+        "de": "Adressbücher lesen",
+        "es": "Leer las libretas de direcciones"
+      },
+      "description": {
+        "en": "Only what changed is downloaded. An account change is read at once.",
+        "fr": "Seul ce qui a changé est téléchargé. Un changement de compte est lu tout de suite.",
+        "de": "Nur Geändertes wird geladen. Eine Kontoänderung wird sofort gelesen.",
+        "es": "Solo se descarga lo que ha cambiado. Un cambio de cuenta se lee al momento."
+      },
+      "default": "6",
+      "options": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "value": "1",
+          "label": {
+            "en": "Every hour",
+            "fr": "Toutes les heures",
+            "de": "Stündlich",
+            "es": "Cada hora"
+          }
+        },
+        {
+          "value": "6",
+          "label": {
+            "en": "Every 6 hours",
+            "fr": "Toutes les 6 heures",
+            "de": "Alle 6 Stunden",
+            "es": "Cada 6 horas"
+          }
+        },
+        {
+          "value": "24",
+          "label": {
+            "en": "Once a day",
+            "fr": "Une fois par jour",
+            "de": "Einmal am Tag",
+            "es": "Una vez al día"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "notify_hour",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
+      "label": {
+        "en": "Time of the scene reminders",
+        "fr": "Heure des rappels de scène",
+        "de": "Uhrzeit der Szenen-Erinnerungen",
+        "es": "Hora de los recordatorios de escena"
+      },
+      "description": {
+        "en": "When the \"Birthday reminder\" trigger fires each day.",
+        "fr": "Quand le déclencheur « Rappel d'anniversaire » se déclenche chaque jour.",
+        "de": "Wann der Auslöser „Geburtstagserinnerung“ jeden Tag auslöst.",
+        "es": "Cuándo se activa cada día el disparador «Recordatorio de cumpleaños»."
+      },
+      "default": "8",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "7",
+          "label": {
+            "en": "07:00",
+            "fr": "07:00",
+            "de": "07:00",
+            "es": "07:00"
+          }
+        },
+        {
+          "value": "8",
+          "label": {
+            "en": "08:00",
+            "fr": "08:00",
+            "de": "08:00",
+            "es": "08:00"
+          }
+        },
+        {
+          "value": "9",
+          "label": {
+            "en": "09:00",
+            "fr": "09:00",
+            "de": "09:00",
+            "es": "09:00"
+          }
+        },
+        {
+          "value": "10",
+          "label": {
+            "en": "10:00",
+            "fr": "10:00",
+            "de": "10:00",
+            "es": "10:00"
+          }
+        },
+        {
+          "value": "12",
+          "label": {
+            "en": "12:00",
+            "fr": "12:00",
+            "de": "12:00",
+            "es": "12:00"
+          }
+        },
+        {
+          "value": "18",
+          "label": {
+            "en": "18:00",
+            "fr": "18:00",
+            "de": "18:00",
+            "es": "18:00"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
-      "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the scene texts",
+        "fr": "Langue des textes des scènes",
+        "de": "Sprache der Szenentexte",
+        "es": "Idioma de los textos de las escenas"
       },
-      "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "description": {
+        "en": "Sentences and dates handed to scenes. Calendars follow the language of their owner.",
+        "fr": "Phrases et dates transmises aux scènes. Les calendriers suivent la langue de leur propriétaire.",
+        "de": "An Szenen übergebene Sätze und Daten. Kalender folgen der Sprache ihres Besitzers.",
+        "es": "Frases y fechas que se pasan a las escenas. Los calendarios siguen el idioma de su propietario."
+      },
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
-  "actions": [
+  "account_schema": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
+      "key": "intro",
+      "type": "section",
+      "label": {
+        "en": "Your address book",
+        "fr": "Votre carnet d'adresses",
+        "de": "Dein Adressbuch",
+        "es": "Su libreta de direcciones"
+      },
+      "description": {
+        "en": "The CardDAV server of your contacts: Nextcloud (https://cloud.example.com/remote.php/dav), iCloud (https://contacts.icloud.com), Radicale, Baïkal… Use an app password when the service offers one. Then share the Birthdays calendar below to see it on the dashboard and use it in scenes.",
+        "fr": "Le serveur CardDAV de vos contacts : Nextcloud (https://cloud.example.com/remote.php/dav), iCloud (https://contacts.icloud.com), Radicale, Baïkal… Utilisez un mot de passe d'application quand le service en propose. Partagez ensuite le calendrier Anniversaires ci-dessous pour le voir sur le tableau de bord et l'utiliser dans les scènes.",
+        "de": "Der CardDAV-Server deiner Kontakte: Nextcloud (https://cloud.example.com/remote.php/dav), iCloud (https://contacts.icloud.com), Radicale, Baïkal… Nutze ein App-Passwort, wenn der Dienst eines anbietet. Teile dann unten den Geburtstagskalender, um ihn auf dem Dashboard zu sehen und in Szenen zu nutzen.",
+        "es": "El servidor CardDAV de sus contactos: Nextcloud (https://cloud.example.com/remote.php/dav), iCloud (https://contacts.icloud.com), Radicale, Baïkal… Use una contraseña de aplicación cuando el servicio la ofrezca. Después comparta abajo el calendario de cumpleaños para verlo en el panel y usarlo en escenas."
+      }
     },
     {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "server_url",
+      "type": "string",
+      "required": true,
+      "label": {
+        "en": "CardDAV server address",
+        "fr": "Adresse du serveur CardDAV",
+        "de": "CardDAV-Serveradresse",
+        "es": "Dirección del servidor CardDAV"
+      },
+      "description": {
+        "en": "The server, or the address of one address book.",
+        "fr": "Le serveur, ou l'adresse d'un carnet précis.",
+        "de": "Der Server oder die Adresse eines Adressbuchs.",
+        "es": "El servidor, o la dirección de una libreta concreta."
+      },
+      "placeholder": {
+        "en": "e.g. https://contacts.icloud.com",
+        "fr": "ex. https://contacts.icloud.com",
+        "de": "z. B. https://contacts.icloud.com",
+        "es": "p. ej. https://contacts.icloud.com"
+      }
+    },
+    {
+      "key": "username",
+      "type": "string",
+      "required": true,
+      "label": {
+        "en": "User name",
+        "fr": "Identifiant",
+        "de": "Benutzername",
+        "es": "Usuario"
+      },
+      "placeholder": {
+        "en": "e.g. marie@example.com",
+        "fr": "ex. marie@example.com",
+        "de": "z. B. marie@example.com",
+        "es": "p. ej. marie@example.com"
+      }
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "required": true,
+      "label": {
+        "en": "Password or app password",
+        "fr": "Mot de passe ou mot de passe d'application",
+        "de": "Passwort oder App-Passwort",
+        "es": "Contraseña o contraseña de aplicación"
+      },
+      "description": {
+        "en": "iCloud requires an app password (appleid.apple.com). Kept by Gladys, never logged.",
+        "fr": "iCloud exige un mot de passe d'application (appleid.apple.com). Gardé par Gladys, jamais journalisé.",
+        "de": "iCloud verlangt ein App-Passwort (appleid.apple.com). Von Gladys verwahrt, nie protokolliert.",
+        "es": "iCloud exige una contraseña de aplicación (appleid.apple.com). Guardada por Gladys, nunca registrada."
+      }
+    },
+    {
+      "key": "address_books",
+      "type": "string",
+      "label": {
+        "en": "Address books",
+        "fr": "Carnets d'adresses",
+        "de": "Adressbücher",
+        "es": "Libretas de direcciones"
+      },
+      "description": {
+        "en": "Names of the address books to read, separated by commas. Empty: all of them.",
+        "fr": "Noms des carnets à lire, séparés par des virgules. Vide : tous.",
+        "de": "Namen der zu lesenden Adressbücher, durch Kommas getrennt. Leer: alle.",
+        "es": "Nombres de las libretas que leer, separados por comas. Vacío: todas."
+      },
+      "placeholder": {
+        "en": "e.g. Contacts",
+        "fr": "ex. Contacts",
+        "de": "z. B. Kontakte",
+        "es": "p. ej. Contactos"
+      }
+    },
+    {
+      "key": "anniversaries",
+      "type": "boolean",
+      "default": false,
+      "label": {
+        "en": "Also add wedding anniversaries",
+        "fr": "Ajouter aussi les anniversaires de mariage",
+        "de": "Auch Hochzeitstage hinzufügen",
+        "es": "Añadir también los aniversarios de boda"
+      },
+      "description": {
+        "en": "The ANNIVERSARY date of the contacts, in a second calendar.",
+        "fr": "La date ANNIVERSARY des contacts, dans un second calendrier.",
+        "de": "Das ANNIVERSARY-Datum der Kontakte, in einem zweiten Kalender.",
+        "es": "La fecha ANNIVERSARY de los contactos, en un segundo calendario."
+      }
+    },
+    {
+      "key": "show_age",
+      "type": "boolean",
+      "default": true,
+      "label": {
+        "en": "Show the age in the event names",
+        "fr": "Afficher l'âge dans le nom des événements",
+        "de": "Alter im Terminnamen anzeigen",
+        "es": "Mostrar la edad en el nombre de los eventos"
+      },
+      "description": {
+        "en": "When the year of birth is known: \"Marie's birthday (34)\".",
+        "fr": "Quand l'année de naissance est connue : « Anniversaire de Marie (34 ans) ».",
+        "de": "Wenn das Geburtsjahr bekannt ist: „Geburtstag von Marie (34 Jahre)“.",
+        "es": "Cuando se conoce el año de nacimiento: «Cumpleaños de Marie (34 años)»."
+      }
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "birthday_reminder",
+      "label": {
+        "en": "Birthday reminder",
+        "fr": "Rappel d'anniversaire",
+        "de": "Geburtstagserinnerung",
+        "es": "Recordatorio de cumpleaños"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "Each day at the chosen time, for a birthday of a shared calendar.",
+        "fr": "Chaque jour à l'heure choisie, pour un anniversaire d'un calendrier partagé.",
+        "de": "Jeden Tag zur gewählten Uhrzeit, für einen Geburtstag eines geteilten Kalenders.",
+        "es": "Cada día a la hora elegida, para un cumpleaños de un calendario compartido."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "days_before",
           "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "required": true,
+          "default": "0",
+          "label": {
+            "en": "When",
+            "fr": "Quand",
+            "de": "Wann",
+            "es": "Cuándo"
+          },
+          "options": [
+            {
+              "value": "0",
+              "label": {
+                "en": "On the day",
+                "fr": "Le jour même",
+                "de": "Am Tag selbst",
+                "es": "El mismo día"
+              }
+            },
+            {
+              "value": "1",
+              "label": {
+                "en": "1 day before",
+                "fr": "1 jour avant",
+                "de": "1 Tag vorher",
+                "es": "1 día antes"
+              }
+            },
+            {
+              "value": "2",
+              "label": {
+                "en": "2 days before",
+                "fr": "2 jours avant",
+                "de": "2 Tage vorher",
+                "es": "2 días antes"
+              }
+            },
+            {
+              "value": "3",
+              "label": {
+                "en": "3 days before",
+                "fr": "3 jours avant",
+                "de": "3 Tage vorher",
+                "es": "3 días antes"
+              }
+            },
+            {
+              "value": "7",
+              "label": {
+                "en": "7 days before",
+                "fr": "7 jours avant",
+                "de": "7 Tage vorher",
+                "es": "7 días antes"
+              }
+            },
+            {
+              "value": "14",
+              "label": {
+                "en": "14 days before",
+                "fr": "14 jours avant",
+                "de": "14 Tage vorher",
+                "es": "14 días antes"
+              }
+            },
+            {
+              "value": "30",
+              "label": {
+                "en": "30 days before",
+                "fr": "30 jours avant",
+                "de": "30 Tage vorher",
+                "es": "30 días antes"
+              }
+            }
+          ]
         },
         {
-          "key": "target",
+          "key": "kind",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "label": {
+            "en": "Kind",
+            "fr": "Type",
+            "de": "Art",
+            "es": "Tipo"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "birthday",
+              "label": {
+                "en": "Birthdays",
+                "fr": "Anniversaires",
+                "de": "Geburtstage",
+                "es": "Cumpleaños"
+              }
+            },
+            {
+              "value": "anniversary",
+              "label": {
+                "en": "Wedding anniversaries",
+                "fr": "Anniversaires de mariage",
+                "de": "Hochzeitstage",
+                "es": "Aniversarios de boda"
+              }
+            }
           ]
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Contact",
+            "fr": "Contact",
+            "de": "Kontakt",
+            "es": "Contacto"
+          },
+          "description": {
+            "en": "Exact name of the contact. Empty: anyone.",
+            "fr": "Nom exact du contact. Vide : n'importe qui.",
+            "de": "Genauer Name des Kontakts. Leer: alle.",
+            "es": "Nombre exacto del contacto. Vacío: cualquiera."
+          },
+          "placeholder": {
+            "en": "e.g. Marie Martin",
+            "fr": "ex. Marie Martin",
+            "de": "z. B. Marie Martin",
+            "es": "p. ej. Marie Martin"
+          }
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Name",
+            "fr": "Nom",
+            "de": "Name",
+            "es": "Nombre"
+          }
+        },
+        {
+          "key": "message",
+          "type": "string",
+          "label": {
+            "en": "Ready-made sentence",
+            "fr": "Phrase toute faite",
+            "de": "Fertiger Satz",
+            "es": "Frase preparada"
+          }
+        },
+        {
+          "key": "days_before",
+          "type": "number",
+          "label": {
+            "en": "Days left",
+            "fr": "Jours restants",
+            "de": "Verbleibende Tage",
+            "es": "Días restantes"
+          }
+        },
+        {
+          "key": "age",
+          "type": "number",
+          "label": {
+            "en": "Age or years",
+            "fr": "Âge ou années",
+            "de": "Alter oder Jahre",
+            "es": "Edad o años"
+          }
+        },
+        {
+          "key": "date",
+          "type": "string",
+          "label": {
+            "en": "Date",
+            "fr": "Date",
+            "de": "Datum",
+            "es": "Fecha"
+          }
+        },
+        {
+          "key": "kind",
+          "type": "string",
+          "label": {
+            "en": "Kind (key)",
+            "fr": "Type (clé)",
+            "de": "Art (Schlüssel)",
+            "es": "Tipo (clave)"
+          }
+        },
+        {
+          "key": "kind_label",
+          "type": "string",
+          "label": {
+            "en": "Kind",
+            "fr": "Type",
+            "de": "Art",
+            "es": "Tipo"
+          }
+        },
+        {
+          "key": "user",
+          "type": "string",
+          "label": {
+            "en": "Address book of",
+            "fr": "Carnet de",
+            "de": "Adressbuch von",
+            "es": "Libreta de"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "next_birthday",
+      "label": {
+        "en": "Get the next birthday",
+        "fr": "Connaître le prochain anniversaire",
+        "de": "Nächsten Geburtstag abfragen",
+        "es": "Consultar el próximo cumpleaños"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Who, in how many days, how old, and the birthdays of the day.",
+        "fr": "Qui, dans combien de jours, quel âge, et les anniversaires du jour.",
+        "de": "Wer, in wie vielen Tagen, wie alt, und die Geburtstage des Tages.",
+        "es": "Quién, dentro de cuántos días, qué edad, y los cumpleaños del día."
+      },
+      "timeout_seconds": 10,
       "fields": [
         {
-          "key": "device",
+          "key": "kind",
           "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "label": {
+            "en": "Kind",
+            "fr": "Type",
+            "de": "Art",
+            "es": "Tipo"
+          },
+          "description": {
+            "en": "Empty: both.",
+            "fr": "Vide : les deux.",
+            "de": "Leer: beide.",
+            "es": "Vacío: ambos."
+          },
+          "options": [
+            {
+              "value": "birthday",
+              "label": {
+                "en": "Birthdays",
+                "fr": "Anniversaires",
+                "de": "Geburtstage",
+                "es": "Cumpleaños"
+              }
+            },
+            {
+              "value": "anniversary",
+              "label": {
+                "en": "Wedding anniversaries",
+                "fr": "Anniversaires de mariage",
+                "de": "Hochzeitstage",
+                "es": "Aniversarios de boda"
+              }
+            }
+          ]
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "found",
+          "type": "number",
+          "label": {
+            "en": "Found (1 yes, 0 no)",
+            "fr": "Trouvé (1 oui, 0 non)",
+            "de": "Gefunden (1 ja, 0 nein)",
+            "es": "Encontrado (1 sí, 0 no)"
+          }
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "label": {
+            "en": "Name",
+            "fr": "Nom",
+            "de": "Name",
+            "es": "Nombre"
+          }
+        },
+        {
+          "key": "kind",
+          "type": "string",
+          "label": {
+            "en": "Kind (key)",
+            "fr": "Type (clé)",
+            "de": "Art (Schlüssel)",
+            "es": "Tipo (clave)"
+          }
+        },
+        {
+          "key": "days",
+          "type": "number",
+          "label": {
+            "en": "Days left",
+            "fr": "Jours restants",
+            "de": "Verbleibende Tage",
+            "es": "Días restantes"
+          }
+        },
+        {
+          "key": "date",
+          "type": "string",
+          "label": {
+            "en": "Date",
+            "fr": "Date",
+            "de": "Datum",
+            "es": "Fecha"
+          }
+        },
+        {
+          "key": "message",
+          "type": "string",
+          "label": {
+            "en": "Ready-made sentence",
+            "fr": "Phrase toute faite",
+            "de": "Fertiger Satz",
+            "es": "Frase preparada"
+          }
+        },
+        {
+          "key": "age",
+          "type": "number",
+          "label": {
+            "en": "Age or years (0 unknown)",
+            "fr": "Âge ou années (0 inconnu)",
+            "de": "Alter oder Jahre (0 unbekannt)",
+            "es": "Edad o años (0 desconocido)"
+          }
+        },
+        {
+          "key": "today_count",
+          "type": "number",
+          "label": {
+            "en": "Birthdays today",
+            "fr": "Anniversaires du jour",
+            "de": "Geburtstage heute",
+            "es": "Cumpleaños de hoy"
+          }
+        },
+        {
+          "key": "today_names",
+          "type": "string",
+          "label": {
+            "en": "Names of today",
+            "fr": "Noms du jour",
+            "de": "Namen von heute",
+            "es": "Nombres de hoy"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "birthdays",
+      "label": {
+        "en": "Birthdays",
+        "fr": "Anniversaires",
+        "de": "Geburtstage",
+        "es": "Cumpleaños"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "The next birthdays of the shared calendars.",
+        "fr": "Les prochains anniversaires des calendriers partagés.",
+        "de": "Die nächsten Geburtstage der geteilten Kalender.",
+        "es": "Los próximos cumpleaños de los calendarios compartidos."
+      },
+      "icon": "gift",
+      "settings": [
+        {
+          "key": "count",
+          "type": "select",
+          "default": "5",
+          "label": {
+            "en": "Number of birthdays",
+            "fr": "Nombre d'anniversaires",
+            "de": "Anzahl der Geburtstage",
+            "es": "Número de cumpleaños"
+          },
+          "options": [
+            {
+              "value": "3",
+              "label": {
+                "en": "3",
+                "fr": "3",
+                "de": "3",
+                "es": "3"
+              }
+            },
+            {
+              "value": "5",
+              "label": {
+                "en": "5",
+                "fr": "5",
+                "de": "5",
+                "es": "5"
+              }
+            },
+            {
+              "value": "8",
+              "label": {
+                "en": "8",
+                "fr": "8",
+                "de": "8",
+                "es": "8"
+              }
+            }
+          ]
+        },
+        {
+          "key": "anniversaries",
+          "type": "boolean",
+          "default": true,
+          "label": {
+            "en": "Show wedding anniversaries",
+            "fr": "Afficher les anniversaires de mariage",
+            "de": "Hochzeitstage anzeigen",
+            "es": "Mostrar los aniversarios de boda"
+          }
+        },
+        {
+          "key": "show_age",
+          "type": "boolean",
+          "default": true,
+          "label": {
+            "en": "Show the age",
+            "fr": "Afficher l'âge",
+            "de": "Alter anzeigen",
+            "es": "Mostrar la edad"
+          }
+        }
+      ]
     }
   ]
 }
