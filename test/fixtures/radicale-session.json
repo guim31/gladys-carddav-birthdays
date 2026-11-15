@@ -1,0 +1,63 @@
+[
+  {
+    "method": "PROPFIND",
+    "url": "http://192.0.2.10:5232/.well-known/carddav",
+    "depth": "0",
+    "status": 301,
+    "headers": {
+      "content-type": "text/plain; charset=utf-8",
+      "location": "/"
+    },
+    "body": "Redirected to /"
+  },
+  {
+    "method": "PROPFIND",
+    "url": "http://192.0.2.10:5232/",
+    "depth": "0",
+    "status": 207,
+    "headers": {
+      "content-type": "text/xml; charset=utf-8"
+    },
+    "body": "<?xml version='1.0' encoding='utf-8'?>\n<multistatus xmlns=\"DAV:\" xmlns:CR=\"urn:ietf:params:xml:ns:carddav\" xmlns:CS=\"http://calendarserver.org/ns/\"><response><href>/</href><propstat><prop><resourcetype><collection /></resourcetype><current-user-principal><href>/alice/</href></current-user-principal></prop><status>HTTP/1.1 200 OK</status></propstat><propstat><prop><displayname /><CR:addressbook-home-set /><CS:getctag /><sync-token /></prop><status>HTTP/1.1 404 Not Found</status></propstat></response></multistatus>"
+  },
+  {
+    "method": "PROPFIND",
+    "url": "http://192.0.2.10:5232/alice/",
+    "depth": "0",
+    "status": 207,
+    "headers": {
+      "content-type": "text/xml; charset=utf-8"
+    },
+    "body": "<?xml version='1.0' encoding='utf-8'?>\n<multistatus xmlns=\"DAV:\" xmlns:CR=\"urn:ietf:params:xml:ns:carddav\" xmlns:CS=\"http://calendarserver.org/ns/\"><response><href>/alice/</href><propstat><prop><resourcetype><principal /><collection /></resourcetype><current-user-principal><href>/alice/</href></current-user-principal><CR:addressbook-home-set><href>/alice/</href></CR:addressbook-home-set></prop><status>HTTP/1.1 200 OK</status></propstat><propstat><prop><displayname /><CS:getctag /><sync-token /></prop><status>HTTP/1.1 404 Not Found</status></propstat></response></multistatus>"
+  },
+  {
+    "method": "PROPFIND",
+    "url": "http://192.0.2.10:5232/alice/",
+    "depth": "1",
+    "status": 207,
+    "headers": {
+      "content-type": "text/xml; charset=utf-8"
+    },
+    "body": "<?xml version='1.0' encoding='utf-8'?>\n<multistatus xmlns=\"DAV:\" xmlns:CR=\"urn:ietf:params:xml:ns:carddav\" xmlns:CS=\"http://calendarserver.org/ns/\"><response><href>/alice/</href><propstat><prop><resourcetype><principal /><collection /></resourcetype><current-user-principal><href>/alice/</href></current-user-principal><CR:addressbook-home-set><href>/alice/</href></CR:addressbook-home-set></prop><status>HTTP/1.1 200 OK</status></propstat><propstat><prop><displayname /><CS:getctag /><sync-token /></prop><status>HTTP/1.1 404 Not Found</status></propstat></response><response><href>/alice/contacts/</href><propstat><prop><resourcetype><CR:addressbook /><collection /></resourcetype><displayname>Contacts</displayname><current-user-principal><href>/alice/</href></current-user-principal><CS:getctag>\"9ad0832606d603ab0a8a9b20a849a05d82d0b9166a59b5bf86178bf16461030b\"</CS:getctag><sync-token>http://radicale.org/ns/sync/567b0cff904802cbde13b73157386e849bec6ba54070ca407e1aae399db8b70e</sync-token></prop><status>HTTP/1.1 200 OK</status></propstat><propstat><prop><CR:addressbook-home-set /></prop><status>HTTP/1.1 404 Not Found</status></propstat></response></multistatus>"
+  },
+  {
+    "method": "PROPFIND",
+    "url": "http://192.0.2.10:5232/alice/contacts/",
+    "depth": "1",
+    "status": 207,
+    "headers": {
+      "content-type": "text/xml; charset=utf-8"
+    },
+    "body": "<?xml version='1.0' encoding='utf-8'?>\n<multistatus xmlns=\"DAV:\" xmlns:CR=\"urn:ietf:params:xml:ns:carddav\"><response><href>/alice/contacts/</href><propstat><prop><resourcetype><CR:addressbook /><collection /></resourcetype><getetag>\"9ad0832606d603ab0a8a9b20a849a05d82d0b9166a59b5bf86178bf16461030b\"</getetag><getcontenttype>text/vcard</getcontenttype></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/hugo-long-name.vcf</href><propstat><prop><resourcetype /><getetag>\"cda94c1af26da5c6a01227ed7d9007e616d1bcb125b8e5506b31bd60e0751c87\"</getetag><getcontenttype>text/vcard;charset=utf-8</getcontenttype></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/no-date.vcf</href><propstat><prop><resourcetype /><getetag>\"d3bd362e3dab8d25eb07cd6a406e21b7777ea5d3d01cdb20dad8dc4120d967b1\"</getetag><getcontenttype>text/vcard;charset=utf-8</getcontenttype></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/leo-29-february.vcf</href><propstat><prop><resourcetype /><getetag>\"91f996ec01cea71e9f31469d6dc6841561c8ec1469bf5b39a8123c10ee22bfa4\"</getetag><getcontenttype>text/vcard;charset=utf-8</getcontenttype></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/marie-3.0.vcf</href><propstat><prop><resourcetype /><getetag>\"c13c0a847376eeb39f2984ebf2753cc3d12245756d0f1f883b761664ccd57a3b\"</getetag><getcontenttype>text/vcard;charset=utf-8</getcontenttype></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/paul-apple-omit-year.vcf</href><propstat><prop><resourcetype /><getetag>\"bbb7cb8e055dfaead71e4c40034276b7145fc48ac5e79df14351569fa44beb1b\"</getetag><getcontenttype>text/vcard;charset=utf-8</getcontenttype></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/emilie-4.0-no-year.vcf</href><propstat><prop><resourcetype /><getetag>\"b7d10192c3895a7b3e94ad652bf708a45a0bfa2d136275304667b61e7c26f3ec\"</getetag><getcontenttype>text/vcard;charset=utf-8</getcontenttype></prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>"
+  },
+  {
+    "method": "REPORT",
+    "url": "http://192.0.2.10:5232/alice/contacts/",
+    "depth": "1",
+    "status": 207,
+    "headers": {
+      "content-type": "text/xml; charset=utf-8"
+    },
+    "body": "<?xml version='1.0' encoding='utf-8'?>\n<multistatus xmlns=\"DAV:\" xmlns:CR=\"urn:ietf:params:xml:ns:carddav\"><response><href>/alice/contacts/marie-3.0.vcf</href><propstat><prop><getetag>\"c13c0a847376eeb39f2984ebf2753cc3d12245756d0f1f883b761664ccd57a3b\"</getetag><CR:address-data>BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//Sabre//Sabre VObject 4.5.4//EN\r\nUID:8e5b2f3a-1c4d-4e7a-9b1f-000000000001\r\nADR;TYPE=HOME:;;1 rue de l\\, Exemple;Paris;;75000;France\r\nBDAY:1992-04-12\r\nEMAIL;TYPE=HOME:marie@example.com\r\nFN:Marie Martin\r\nN:Martin;Marie;;;\r\nNOTE:Ne doit jamais sortir du conteneur\r\nTEL;TYPE=CELL:+33 6 00 00 00 01\r\nEND:VCARD\r\n</CR:address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/emilie-4.0-no-year.vcf</href><propstat><prop><getetag>\"b7d10192c3895a7b3e94ad652bf708a45a0bfa2d136275304667b61e7c26f3ec\"</getetag><CR:address-data>BEGIN:VCARD\r\nVERSION:4.0\r\nUID:urn:uuid:4fbe8971-0bc3-424c-9c26-000000000002\r\nANNIVERSARY:20150620\r\nBDAY;VALUE=date:--1118\r\nFN:Émilie Durand\r\nN:Durand;Émilie;;;\r\nEND:VCARD\r\n</CR:address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/leo-29-february.vcf</href><propstat><prop><getetag>\"91f996ec01cea71e9f31469d6dc6841561c8ec1469bf5b39a8123c10ee22bfa4\"</getetag><CR:address-data>BEGIN:VCARD\r\nVERSION:3.0\r\nUID:00000000-0000-4000-8000-000000000004\r\nBDAY:2000-02-29\r\nFN:Léo Bissextile\r\nEND:VCARD\r\n</CR:address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/no-date.vcf</href><propstat><prop><getetag>\"d3bd362e3dab8d25eb07cd6a406e21b7777ea5d3d01cdb20dad8dc4120d967b1\"</getetag><CR:address-data>BEGIN:VCARD\r\nVERSION:4.0\r\nUID:urn:uuid:00000000-0000-4000-8000-000000000005\r\nFN:Plombier Dupont\r\nTEL;VALUE=uri:tel:+33-1-00-00-00-05\r\nEND:VCARD\r\n</CR:address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/paul-apple-omit-year.vcf</href><propstat><prop><getetag>\"bbb7cb8e055dfaead71e4c40034276b7145fc48ac5e79df14351569fa44beb1b\"</getetag><CR:address-data>BEGIN:VCARD\r\nVERSION:3.0\r\nPRODID:-//Apple Inc.//iOS 18.0//EN\r\nUID:A1B2C3D4-0000-4000-8000-000000000003\r\nBDAY;X-APPLE-OMIT-YEAR=1604:1604-11-16\r\nFN:Paul Leroy\r\nN:Leroy;Paul;;;\r\nitem1.X-ABDATE;TYPE=pref:2010-09-04\r\nitem1.X-ABLABEL:_$!&lt;Anniversary&gt;!$_\r\nEND:VCARD\r\n</CR:address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response><response><href>/alice/contacts/hugo-long-name.vcf</href><propstat><prop><getetag>\"cda94c1af26da5c6a01227ed7d9007e616d1bcb125b8e5506b31bd60e0751c87\"</getetag><CR:address-data>BEGIN:VCARD\r\nVERSION:3.0\r\nUID:00000000-0000-4000-8000-000000000006\r\nBDAY:2026-11-16T00:00:00Z\r\nFN:Hugo Lefèvre-de-la-Très-Longue-Lignée-des-Contacts-Aux-Noms-Composés\r\n -Qui-Ne-Finissent-Jamais\r\nEND:VCARD\r\n</CR:address-data></prop><status>HTTP/1.1 200 OK</status></propstat></response></multistatus>"
+  }
+]
