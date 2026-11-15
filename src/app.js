@@ -72,6 +72,8 @@ export function registerHandlers(gladys, deps = {}) {
   let retryMs = RETRY_MIN_MS;
   let stopped = false;
   let pending = Promise.resolve();
+  // The day the reminders were held back for contacts not read yet.
+  let waitedOn = null;
 
   const syncer = new Syncer({
     gladys,
@@ -142,14 +144,16 @@ export function registerHandlers(gladys, deps = {}) {
     if (state.reminded === today || minutes < start) {
       return 0;
     }
-    // Contacts not read yet (server down at start-up): wait for the retries,
-    // within the grace period.
-    if (syncer.waitingForContacts() && minutes < start + REMINDER_GRACE_MINUTES) {
+    const late = minutes >= start + REMINDER_GRACE_MINUTES;
+    // Contacts not read yet (server down at start-up): wait for the retries
+    // within the grace period, then send what is known.
+    if (syncer.waitingForContacts() && !late) {
+      waitedOn = today;
       return 0;
     }
     state = { ...state, reminded: today };
     await store.save(state);
-    if (minutes >= start + REMINDER_GRACE_MINUTES) {
+    if (late && waitedOn !== today) {
       logger.debug(`Reminders of ${today} skipped: the hour is long past`);
       return 0;
     }

@@ -206,6 +206,10 @@ test('no credentials over an https → http redirect, nor to a host sharing only
   await assert.rejects(c.discover(), /unencrypted/);
   assert.equal(sameSite('https://a.example.co.uk/', 'https://b.example.co.uk/'), false);
   assert.equal(sameSite('https://me.duckdns.org/', 'https://you.duckdns.org/'), false);
+  // Nextcloud behind the bare domain: example.com/.well-known → cloud.example.com.
+  assert.equal(sameSite('https://example.com/', 'https://cloud.example.com/remote.php/dav'), true);
+  assert.equal(sameSite('https://example.com/', 'http://cloud.example.com/'), false);
+  assert.equal(sameSite('https://cloud.example.com/', 'https://example.com/'), false);
 });
 
 test('a card listed but not returned by the server is kept, and asked again next time', async () => {

@@ -82,15 +82,26 @@ const firstHref = (value) => {
 // shared suffix (co.uk, duckdns.org) proves nothing.
 const SIBLING_DOMAINS = ['icloud.com'];
 
-/** Where the credentials may go: the same host, or a sibling of a known provider. */
+/**
+ * Where the credentials may go: the same host; over https, a subdomain of
+ * the host typed (example.com/.well-known → cloud.example.com) or its www
+ * twin; a sibling of a known provider.
+ */
 export function sameSite(a, b) {
+  const urlB = new URL(b);
   const hostA = new URL(a).hostname.toLowerCase();
-  const hostB = new URL(b).hostname.toLowerCase();
+  const hostB = urlB.hostname.toLowerCase();
   if (hostA === hostB) {
     return true;
   }
   const under = (host, domain) => host === domain || host.endsWith(`.${domain}`);
-  return SIBLING_DOMAINS.some((domain) => under(hostA, domain) && under(hostB, domain));
+  if (SIBLING_DOMAINS.some((domain) => under(hostA, domain) && under(hostB, domain))) {
+    return true;
+  }
+  if (urlB.protocol !== 'https:' || /^[\d.]+$|:/.test(hostA)) {
+    return false;
+  }
+  return under(hostB, hostA) || hostA === `www.${hostB}`;
 }
 
 /** A URL compared by its decoded path: servers differ in percent-encoding. */
@@ -239,7 +250,7 @@ export class CardDavClient {
     if (!sameSite(this.url, url)) {
       throw new CardDavError(
         'http',
-        `the server pointed to another domain (${new URL(url).hostname})`,
+        `the server pointed to another domain (${new URL(url).hostname}): enter that address instead`,
       );
     }
     let response;

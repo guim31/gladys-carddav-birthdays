@@ -319,23 +319,25 @@ export class Syncer {
   }
 
   /**
-   * The dates of the shared calendars only: what the household sees, the
-   * only ones the scenes and the dashboard use (like the core's calendar
-   * scenes). The same contact in two shared books of the house counts once.
-   */
-  /**
-   * A user whose shared calendar has never been read (server down since the
-   * start): the reminders of the day would miss their contacts.
+   * A user whose shared calendar has never been read because of a passing
+   * error (server down since the start): the reminders of the day would miss
+   * their contacts. A permanent error (wrong password) is not waited for.
    */
   waitingForContacts() {
     return [...this.users.values()].some(
       (user) =>
         user.error &&
+        !PERMANENT.includes(user.error.code) &&
         user.entries.length === 0 &&
         Object.values(user.calendars).some((flags) => flags.shared && flags.sync),
     );
   }
 
+  /**
+   * The dates of the shared calendars only: what the household sees, the
+   * only ones the scenes and the dashboard use (like the core's calendar
+   * scenes). The same contact in two shared books of the house counts once.
+   */
   sharedEntries() {
     const seen = new Set();
     const list = [];

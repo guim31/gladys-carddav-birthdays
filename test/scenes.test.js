@@ -158,3 +158,31 @@ test('contacts never read (server down since start-up): the reminders wait for t
   world.clock.now = NOW + HOUR + 20 * 60_000; // 08:20
   assert.equal(await world.app.tick(), 2);
 });
+
+test('a wrong password for one user does not hold back the reminders of the others', async () => {
+  const world = await createWorld({
+    accounts: [account('alice'), account('bob', { password: 'wrong' })],
+  });
+  for (const calendar of world.fake.calendars) {
+    calendar.shared = true;
+  }
+  await world.resync();
+  assert.equal(world.syncer.waitingForContacts(), false);
+  world.clock.now = NOW + HOUR + 60_000;
+  assert.equal(await world.app.tick(), 2);
+});
+
+test('a server down for the whole grace hour: what is known is sent at its end', async () => {
+  const world = await createWorld({ accounts: [account('alice'), account('bob')] });
+  for (const calendar of world.fake.calendars) {
+    calendar.shared = true;
+  }
+  world.server.down = true;
+  world.syncer.source.forget('bob');
+  world.syncer.users.get('bob').entries = [];
+  await world.resync();
+  world.clock.now = NOW + HOUR + 60_000;
+  assert.equal(await world.app.tick(), 0);
+  world.clock.now = NOW + 2 * HOUR + 60_000; // grace hour over
+  assert.equal(await world.app.tick(), 2);
+});
