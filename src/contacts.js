@@ -57,7 +57,9 @@ export class ContactSource {
       entry = { fingerprint: account.fingerprint, books: new Map() };
     }
     let books = await client.discover();
-    if (account.addressBooks.length > 0) {
+    if (account.addressBooks.length === 0) {
+      books = books.filter((book) => !CardDavClient.isSystemBook(book.url));
+    } else {
       books = books.filter((book) => account.addressBooks.includes(fold(book.name)));
       if (books.length === 0) {
         throw new CardDavError('no_address_book', 'no address book of this name');
@@ -88,16 +90,29 @@ export class ContactSource {
           missing.push(url);
         }
       }
-      for (const card of await client.multiget(book.url, missing)) {
+      const fetched = await client.multiget(book.url, missing);
+      for (const card of fetched) {
         const parsed = parseVCard(card.data);
         const key = keyOf(parsed.uid ?? card.url);
         cards.set(card.url, {
-          etag: card.etag,
+          // The etag of the listing: some servers leave it out of the REPORT.
+          etag: etags.get(card.url) || card.etag,
           dates: contactDates(parsed).map((date) => ({ ...date, key })),
         });
         downloaded += 1;
       }
-      next.set(book.url, { ctag: book.ctag, cards });
+      // A card listed but not returned is kept as it was, never dropped:
+      // dropping it would prune its events.
+      for (const url of missing) {
+        const known = previous?.cards.get(url);
+        if (!cards.has(url) && known) {
+          cards.set(url, known);
+        }
+      }
+      // Incomplete: no ctag, so the next reading asks again.
+      const returned = new Set(fetched.map((card) => card.url));
+      const complete = missing.every((url) => returned.has(url));
+      next.set(book.url, { ctag: complete ? book.ctag : null, cards });
       total += cards.size;
     }
     entry.books = next;

@@ -44,7 +44,8 @@ llegan al panel, a las escenas y a los demás miembros del hogar.
 ### Nextcloud
 
 Dirección `https://cloud.example.com/remote.php/dav`, su usuario y una contraseña de aplicación
-creada en **Configuración → Seguridad → Dispositivos y sesiones**.
+creada en **Configuración → Seguridad → Dispositivos y sesiones**. La libreta del sistema de Nextcloud (todas
+las cuentas de la instancia) se omite, salvo que la nombre.
 
 ### iCloud
 

@@ -36,6 +36,8 @@ export class CardDavError extends Error {
 const parser = new XMLParser({
   removeNSPrefix: true,
   ignoreAttributes: true,
+  // SabreDAV (Nextcloud, Baïkal) escapes the CR of each vCard line as `&#13;`.
+  htmlEntities: true,
   parseTagValue: false,
   trimValues: false,
   isArray: (name) => ['response', 'propstat', 'href'].includes(name),
@@ -75,21 +77,35 @@ const firstHref = (value) => {
   return href ? text(href).trim() : null;
 };
 
-/** Same host, or same registrable-looking domain (the last two labels). */
+// Providers known to answer from sibling hosts (contacts.icloud.com sends the
+// client to pNN-contacts.icloud.com). Anywhere else, the exact host only: a
+// shared suffix (co.uk, duckdns.org) proves nothing.
+const SIBLING_DOMAINS = ['icloud.com'];
+
+/** Where the credentials may go: the same host, or a sibling of a known provider. */
 export function sameSite(a, b) {
-  const hostA = new URL(a).hostname;
-  const hostB = new URL(b).hostname;
+  const hostA = new URL(a).hostname.toLowerCase();
+  const hostB = new URL(b).hostname.toLowerCase();
   if (hostA === hostB) {
     return true;
   }
-  if (/^[\d.]+$|:/.test(hostA) || /^[\d.]+$|:/.test(hostB)) {
-    return false;
-  }
-  const tail = (host) => host.split('.').slice(-2).join('.');
-  return hostA.includes('.') && tail(hostA) === tail(hostB);
+  const under = (host, domain) => host === domain || host.endsWith(`.${domain}`);
+  return SIBLING_DOMAINS.some((domain) => under(hostA, domain) && under(hostB, domain));
 }
 
-/** The digest `Authorization` header for one request (RFC 7616, MD5, qop=auth). */
+/** A URL compared by its decoded path: servers differ in percent-encoding. */
+export function urlKey(url) {
+  const parsed = new URL(url);
+  let path = parsed.pathname;
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Keep the raw path.
+  }
+  return `${parsed.host.toLowerCase()}${path.replace(/\/+$/, '')}`;
+}
+
+/** The digest `Authorization` header for one request (RFC 7616, MD5 or SHA-256, qop=auth). */
 export function digestHeader(challenge, { username, password, method, uri, nc, cnonce }) {
   const params = {};
   for (const match of challenge.matchAll(/(\w+)=(?:"([^"]*)"|([^,\s]+))/g)) {
@@ -102,16 +118,20 @@ export function digestHeader(challenge, { username, password, method, uri, nc, c
     ? 'auth'
     : null;
   const ncText = String(nc).padStart(8, '0');
-  let ha1 = md5(`${username}:${params.realm}:${password}`);
-  if ((params.algorithm ?? '').toUpperCase() === 'MD5-SESS') {
-    ha1 = md5(`${ha1}:${params.nonce}:${cnonce}`);
+  const algorithm = (params.algorithm ?? 'MD5').toUpperCase();
+  const h = algorithm.startsWith('SHA-256')
+    ? (value) => createHash('sha256').update(value).digest('hex')
+    : md5;
+  let ha1 = h(`${username}:${params.realm}:${password}`);
+  if (algorithm.endsWith('-SESS')) {
+    ha1 = h(`${ha1}:${params.nonce}:${cnonce}`);
   }
-  const ha2 = md5(`${method}:${uri}`);
+  const ha2 = h(`${method}:${uri}`);
   const response = qop
-    ? md5(`${ha1}:${params.nonce}:${ncText}:${cnonce}:${qop}:${ha2}`)
-    : md5(`${ha1}:${params.nonce}:${ha2}`);
+    ? h(`${ha1}:${params.nonce}:${ncText}:${cnonce}:${qop}:${ha2}`)
+    : h(`${ha1}:${params.nonce}:${ha2}`);
   const parts = [
-    `username="${username}"`,
+    `username="${String(username).replace(/["\\]/g, '\\$&')}"`,
     `realm="${params.realm}"`,
     `nonce="${params.nonce}"`,
     `uri="${uri}"`,
@@ -194,7 +214,8 @@ export class CardDavClient {
   }
 
   authorization(method, url) {
-    if (this.digest) {
+    // A challenge belongs to the host that sent it.
+    if (this.digest && this.digest.host === new URL(url).host) {
       this.digest.nc += 1;
       const target = new URL(url);
       return digestHeader(this.digest.challenge, {
@@ -242,6 +263,9 @@ export class CardDavClient {
       const location = response.headers.get('location');
       await response.body?.cancel?.();
       if (location) {
+        if (url.startsWith('https:') && !new URL(location, url).href.startsWith('https:')) {
+          throw new CardDavError('http', 'the server redirected to an unencrypted address');
+        }
         return this.request(method, new URL(location, url).href, { depth, body }, attempt + 1);
       }
     }
@@ -249,8 +273,10 @@ export class CardDavClient {
       const challenge = response.headers.get('www-authenticate') ?? '';
       await response.body?.cancel?.();
       const stale = /stale="?true/i.test(challenge);
-      if (/^\s*digest/i.test(challenge) && (!this.digest || stale) && attempt < 6) {
-        this.digest = { challenge, nc: 0 };
+      const host = new URL(url).host;
+      const fresh = !this.digest || this.digest.host !== host || stale;
+      if (/^\s*digest/i.test(challenge) && fresh && attempt < 6) {
+        this.digest = { challenge, nc: 0, host };
         return this.request(method, url, { depth, body }, attempt + 1);
       }
       throw new CardDavError('auth', 'wrong user name or password (HTTP 401)');
@@ -324,6 +350,15 @@ export class CardDavClient {
   }
 
   /**
+   * Nextcloud's "system" address book holds every user of the instance
+   * (birthdays of colleagues included): left out unless named in the
+   * account's list.
+   */
+  static isSystemBook(bookUrl) {
+    return /\/z-server-generated--system\/?$/.test(new URL(bookUrl).pathname);
+  }
+
+  /**
    * The cards of an address book: `href -> etag`.
    * @returns {Promise<Map<string, string>>}
    */
@@ -351,14 +386,16 @@ export class CardDavClient {
     const cards = [];
     for (let i = 0; i < urls.length; i += MULTIGET_BATCH) {
       const batch = urls.slice(i, i + MULTIGET_BATCH);
-      const asked = new Set(batch);
+      // Matched by decoded path: the answer may encode `@` or `:` otherwise.
+      const asked = new Map(batch.map((url) => [urlKey(url), url]));
       const hrefs = batch.map((url) => new URL(url).pathname);
       const answer = await this.request('REPORT', bookUrl, { depth: 1, body: multigetBody(hrefs) });
       for (const entry of parseMultistatus(answer.body, answer.url)) {
         const data = text(entry.props['address-data']);
         // Only what was asked: a server answering more must not count twice.
-        if (asked.has(entry.url) && data.includes('BEGIN:VCARD')) {
-          cards.push({ url: entry.url, etag: text(entry.props.getetag).trim(), data });
+        const url = asked.get(urlKey(entry.url));
+        if (url && data.includes('BEGIN:VCARD')) {
+          cards.push({ url, etag: text(entry.props.getetag).trim(), data });
         }
       }
     }

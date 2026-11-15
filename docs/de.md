@@ -43,7 +43,8 @@ Dashboard, die Szenen und die anderen Mitglieder des Haushalts.
 ### Nextcloud
 
 Adresse `https://cloud.example.com/remote.php/dav`, dein Benutzername und ein App-Passwort, erstellt
-unter **Einstellungen → Sicherheit → Geräte & Sitzungen**.
+unter **Einstellungen → Sicherheit → Geräte & Sitzungen**. Das System-Adressbuch von Nextcloud (alle
+Konten der Instanz) wird ausgelassen, außer du nennst es.
 
 ### iCloud
 

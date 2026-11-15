@@ -42,7 +42,8 @@ the scenes and the other members of the household.
 ### Nextcloud
 
 Address `https://cloud.example.com/remote.php/dav`, your user name, and an app password created in
-**Settings → Security → Devices & sessions**.
+**Settings → Security → Devices & sessions**. Nextcloud's system address book (every user of the
+instance) is left out unless you name it.
 
 ### iCloud
 

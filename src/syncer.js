@@ -23,6 +23,7 @@ const logger = createLogger({ name: 'sync' });
 export const KINDS = ['birthday', 'anniversary'];
 export const PAST_DAYS = 7;
 export const AHEAD_MONTHS = 12;
+export const PERMANENT = ['auth', 'invalid_url', 'not_found', 'no_address_book'];
 export const COLORS = { birthday: '#e64980', anniversary: '#7048e8' };
 
 /** A short reason for the logs, never a secret. */
@@ -96,16 +97,15 @@ export class Syncer {
       const enabled = new Set(accounts.map((account) => account.user.selector));
       for (const selector of this.users.keys()) {
         if (!enabled.has(selector)) {
-          this.users.delete(selector);
-          this.source.forget(selector);
+          this.dropUser(selector);
         }
       }
       const failures = [];
       for (const account of accounts) {
         const own = calendars.filter((calendar) => calendar.user === account.user.selector);
-        const error = await this.syncAccount(account, own, { fetch });
-        if (error) {
-          failures.push(`${account.user.selector}: ${error}`);
+        const failure = await this.syncAccount(account, own, { fetch });
+        if (failure) {
+          failures.push({ ...failure, text: `${account.user.selector}: ${failure.text}` });
         }
       }
       this.ready = true;
@@ -121,13 +121,32 @@ export class Syncer {
       );
       if (!account) {
         // Disabled: the core already destroyed their calendars.
-        this.users.delete(selector);
-        this.source.forget(selector);
+        this.dropUser(selector);
         return { users: 0, failures: [] };
       }
-      const error = await this.syncAccount(account, await this.gladys.getCalendars(selector));
-      return { users: 1, failures: error ? [`${selector}: ${error}`] : [] };
+      const failure = await this.syncAccount(account, await this.gladys.getCalendars(selector));
+      return {
+        users: 1,
+        failures: failure ? [{ ...failure, text: `${selector}: ${failure.text}` }] : [],
+      };
     });
+  }
+
+  /** A user gone: their cache and the memory of what was written for them. */
+  dropUser(selector) {
+    this.users.delete(selector);
+    this.source.forget(selector);
+    this.forgetWritten(`calendars:${selector}`);
+    this.forgetWritten(this.calendarId(selector, ''));
+  }
+
+  /** Forgets the writes whose id starts with `prefix`: they will be made again. */
+  forgetWritten(prefix) {
+    for (const id of [...this.written.keys()]) {
+      if (id.startsWith(prefix)) {
+        this.written.delete(id);
+      }
+    }
   }
 
   calendarId(selector, kind) {
@@ -184,6 +203,13 @@ export class Syncer {
       description: description(kind),
       color: COLORS[kind],
     }));
+    // A calendar Gladys does not hold (created by this push, or destroyed and
+    // created again: account off and on, anniversaries off and on) gets
+    // everything written, whatever was written before.
+    const held = new Set(existing.map((calendar) => calendar.external_id));
+    if (calendars.some((calendar) => !held.has(calendar.external_id))) {
+      this.forgetWritten(`calendars:${selector}`);
+    }
     const failures = [];
     const write = async (id, value, fn) => {
       const digest = hash(value);
@@ -208,7 +234,7 @@ export class Syncer {
         try {
           await this.limit();
           await this.gladys.deleteCalendar(calendar.external_id);
-          this.written.delete(calendar.external_id);
+          this.forgetWritten(`${calendar.external_id}#`);
         } catch (err) {
           failures.push(describe(err));
         }
@@ -221,6 +247,11 @@ export class Syncer {
       const calendarId = this.calendarId(selector, kind);
       const stored = existing.find((calendar) => calendar.external_id === calendarId);
       flags[kind] = { shared: stored?.shared === true, sync: stored?.sync !== false };
+      // Not held, or switched off (`sync: false` empties it): written in full
+      // when it comes back.
+      if (!stored || !flags[kind].sync) {
+        this.forgetWritten(`${calendarId}#`);
+      }
       // Never read yet: nothing to write, the next reading fills the calendar.
       // `sync: false` is the user saying no: the core would answer 403.
       if (entries === null || !flags[kind].sync) {
@@ -231,7 +262,14 @@ export class Syncer {
         fromDate,
         toDate,
       );
-      for (const [index, chunk] of chunkByDate(list, fromDate, toDate).entries()) {
+      const chunks = chunkByDate(list, fromDate, toDate);
+      // Fewer requests than before: the first window now covers the others.
+      for (const id of [...this.written.keys()]) {
+        if (id.startsWith(`${calendarId}#`) && Number(id.split('#')[1]) >= chunks.length) {
+          this.written.delete(id);
+        }
+      }
+      for (const [index, chunk] of chunks.entries()) {
         const events = chunk.items.map((item) => ({
           external_id: this.gladys.externalId(`${selector}:${kind}:${item.key}:${item.year}`),
           name: eventName(item, language, settings.showAge),
@@ -252,6 +290,7 @@ export class Syncer {
           // read: the user's notification follows.
           if (err?.status === 403 || err?.status === 404) {
             flags[kind].sync = false;
+            this.forgetWritten(`${calendarId}#`);
             break;
           }
           failures.push(describe(err));
@@ -268,9 +307,15 @@ export class Syncer {
       error: error ? { code: error.code ?? 'http', message: describe(error) } : null,
     });
     if (failures.length > 0) {
-      return failures.join('; ');
+      return { text: failures.join('; '), retry: true };
     }
-    return error ? describe(error) : null;
+    if (error) {
+      // A wrong password or address stays wrong until the user fixes it
+      // (which notifies us): no quick retries, they would only feed the
+      // server's brute-force protection.
+      return { text: describe(error), retry: !PERMANENT.includes(error.code) };
+    }
+    return null;
   }
 
   /**
@@ -278,6 +323,19 @@ export class Syncer {
    * only ones the scenes and the dashboard use (like the core's calendar
    * scenes). The same contact in two shared books of the house counts once.
    */
+  /**
+   * A user whose shared calendar has never been read (server down since the
+   * start): the reminders of the day would miss their contacts.
+   */
+  waitingForContacts() {
+    return [...this.users.values()].some(
+      (user) =>
+        user.error &&
+        user.entries.length === 0 &&
+        Object.values(user.calendars).some((flags) => flags.shared && flags.sync),
+    );
+  }
+
   sharedEntries() {
     const seen = new Set();
     const list = [];

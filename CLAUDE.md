@@ -292,5 +292,19 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Rappels : un minuteur de 30 s ; une fois par jour à l'heure choisie (`notify_hour`), un événement par
   date à 0, 1, 2, 3, 7, 14 ou 30 jours ; la date du dernier envoi est gardée dans `/data/state.json`
   (pas de doublon au redémarrage) ; heure dépassée de plus d'une heure : sautée.
+- **SabreDAV (Nextcloud, Baïkal) échappe le CR de chaque ligne vCard en `&#13;`** : `htmlEntities: true`
+  dans fast-xml-parser, sinon `BDAY:…&#13;` ne se lit pas (Radicale ne le fait pas : les tests contre
+  Radicale seuls ne le voient pas). Les `href` d'une réponse multiget se comparent par chemin décodé.
+- Identifiants : hôte exact seulement, plus les frères d'`icloud.com` ; jamais de https → http. Un défi
+  Digest appartient à son hôte ; MD5 et SHA-256.
+- Hachages d'écriture (`written`) : oubliés pour un calendrier absent de Gladys (créé, recréé), coupé
+  (`sync: false`) ou d'un utilisateur parti ; sinon un compte désactivé puis réactivé resterait vide.
+- Erreur permanente (mot de passe, adresse, carnet introuvable) : pas de reprise rapide (protection
+  anti-force brute de Nextcloud), seulement le cycle normal ou la modification du compte.
+- Carnet « système » de Nextcloud (`z-server-generated--system`, tous les comptes de l'instance) : ignoré
+  sauf s'il est nommé dans le réglage.
+- Une carte listée mais pas rendue par le serveur garde son ancien état et le ctag n'est pas retenu.
+- Rappels : tant qu'un utilisateur partagé n'a jamais été lu (serveur en panne au démarrage), ils
+  attendent, dans la limite de l'heure de grâce.
 - Google Contacts : CardDAV en OAuth seulement, non pris en charge (le dire, ne pas le promettre).
 - Testée contre Radicale (`tomsquest/docker-radicale`) en Docker ; Nextcloud, iCloud, Baïkal non essayés.

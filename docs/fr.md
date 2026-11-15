@@ -45,7 +45,8 @@ tableau de bord, aux scènes et aux autres membres du foyer.
 ### Nextcloud
 
 Adresse `https://cloud.example.com/remote.php/dav`, votre identifiant, et un mot de passe
-d'application créé dans **Paramètres → Sécurité → Appareils et sessions**.
+d'application créé dans **Paramètres → Sécurité → Appareils et sessions**. Le carnet système de Nextcloud (tous les comptes
+de l'instance) est ignoré, sauf si vous le nommez.
 
 ### iCloud
 

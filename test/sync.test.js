@@ -222,3 +222,57 @@ test('more than 500 events: disjoint windows cut between two days', async () => 
     1200,
   );
 });
+
+test('an account switched off and on again gets its calendar back, in full', async () => {
+  const world = await createWorld();
+  const accounts = [...world.fake.calendarAccounts];
+  // The core destroys the calendars of a disabled account.
+  world.fake.calendarAccounts.length = 0;
+  await world.gladys.deleteCalendar(BIRTHDAYS).catch(() => {});
+  world.fake.calendars = [];
+  world.fake.calendarEvents = [];
+  await world.fake.calendarAccountUpdated('alice');
+  await world.app.idle();
+  world.fake.calendarAccounts.push(...accounts);
+  await world.fake.calendarAccountUpdated('alice');
+  await world.app.idle();
+  assert.equal(world.fake.calendars.length, 1);
+  assert.equal(world.eventsOf(BIRTHDAYS).length, 4);
+});
+
+test('anniversaries off and on, sync off and on: the events come back at once', async () => {
+  const world = await createWorld({ accounts: [account('alice', { anniversaries: true })] });
+  await world.editAccount('alice', { anniversaries: false });
+  await world.editAccount('alice', { anniversaries: true });
+  assert.equal(world.eventsOf(ANNIVERSARIES).length, 2);
+
+  // The core empties a calendar switched off.
+  const calendar = world.fake.calendars.find((c) => c.external_id === BIRTHDAYS);
+  calendar.sync = false;
+  world.fake.calendarEvents = world.fake.calendarEvents.filter(
+    (e) => e.calendar_external_id !== BIRTHDAYS,
+  );
+  await world.fake.calendarAccountUpdated('alice');
+  await world.app.idle();
+  calendar.sync = true;
+  await world.fake.calendarAccountUpdated('alice');
+  await world.app.idle();
+  assert.equal(world.eventsOf(BIRTHDAYS).length, 4);
+});
+
+test('a wrong password is not retried quickly, a server down is', async () => {
+  const world = await createWorld();
+  world.server.password = 'changed';
+  let result = await world.syncer.syncAll();
+  assert.deepEqual(
+    result.failures.map((f) => f.retry),
+    [false],
+  );
+  world.server.password = 'test-app-password';
+  world.server.down = true;
+  result = await world.syncer.syncAll();
+  assert.deepEqual(
+    result.failures.map((f) => f.retry),
+    [true],
+  );
+});

@@ -140,3 +140,21 @@ test('the widget: the next birthdays, valid for the core, in the viewer language
   assert.equal(titles.length, 5);
   assert.ok(titles.every((subtitle) => !/Jahr|Hochzeit/.test(subtitle)));
 });
+
+test('contacts never read (server down since start-up): the reminders wait for them', async () => {
+  const world = await createWorld();
+  await world.share('Anniversaires');
+  // A restart with the server down: nothing in memory.
+  world.server.down = true;
+  world.syncer.source.forget('alice');
+  world.syncer.users.get('alice').entries = [];
+  await world.resync();
+  assert.ok(world.syncer.waitingForContacts());
+  world.clock.now = NOW + HOUR + 60_000; // 08:01
+  assert.equal(await world.app.tick(), 0);
+  assert.equal(world.saved.state.reminded, undefined);
+  world.server.down = false;
+  await world.resync();
+  world.clock.now = NOW + HOUR + 20 * 60_000; // 08:20
+  assert.equal(await world.app.tick(), 2);
+});

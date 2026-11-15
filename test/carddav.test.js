@@ -178,3 +178,67 @@ test('Digest authentication (RFC 2617 example), as Baïkal asks', async () => {
   assert.match(seen[0], /^Basic /);
   assert.match(seen[1], /^Digest username="alice", realm="BaikalDAV"/);
 });
+
+test('SabreDAV (Nextcloud, Baïkal): the CR of each line escaped as &#13;, hrefs encoded otherwise', async () => {
+  const body =
+    '<?xml version="1.0"?>\n<d:multistatus xmlns:d="DAV:" xmlns:card="urn:ietf:params:xml:ns:carddav"><d:response><d:href>/remote.php/dav/addressbooks/users/marie%40example.com/contacts/A%3A1.vcf</d:href><d:propstat><d:prop><d:getetag>&quot;e1&quot;</d:getetag><card:address-data>BEGIN:VCARD&#13;\nVERSION:3.0&#13;\nFN:Marie &amp; Paul&#13;\nBDAY:1985-04-12&#13;\nUID:a1&#13;\nEND:VCARD&#13;\n</card:address-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>';
+  const fetch = async () => new Response(body, { status: 207 });
+  const book =
+    'https://cloud.example.com/remote.php/dav/addressbooks/users/marie@example.com/contacts/';
+  const c = new CardDavClient({ url: book, username: 'm', password: 'p', fetch });
+  const [card] = await c.multiget(book, [`${book}A:1.vcf`]);
+  assert.equal(card.url, `${book}A:1.vcf`);
+  const { parseVCard, contactDates } = await import('../src/vcard.js');
+  assert.deepEqual(contactDates(parseVCard(card.data)), [
+    { kind: 'birthday', name: 'Marie & Paul', month: 4, day: 12, year: 1985 },
+  ]);
+});
+
+test('no credentials over an https → http redirect, nor to a host sharing only a suffix', async () => {
+  const fetch = async () =>
+    new Response(null, { status: 301, headers: { location: 'http://dav.example.com/' } });
+  const c = new CardDavClient({
+    url: 'https://dav.example.com/dav/',
+    username: 'a',
+    password: 'b',
+    fetch,
+  });
+  await assert.rejects(c.discover(), /unencrypted/);
+  assert.equal(sameSite('https://a.example.co.uk/', 'https://b.example.co.uk/'), false);
+  assert.equal(sameSite('https://me.duckdns.org/', 'https://you.duckdns.org/'), false);
+});
+
+test('a card listed but not returned by the server is kept, and asked again next time', async () => {
+  const server = createServer();
+  const source = new ContactSource({
+    createClient: (options) => new CardDavClient({ ...options, fetch: server.fetch }),
+  });
+  const account = parseAccount({ server_url: `${SERVER}/`, username: 'alice', password: PASSWORD });
+  const first = await source.load('alice', account);
+  // The book changes, and the REPORT answers nothing.
+  const home = SESSION.find(
+    (e) => e.method === 'PROPFIND' && e.url === `${SERVER}/alice/` && e.depth === '1',
+  );
+  server.overrides.set(`PROPFIND ${SERVER}/alice/ 1`, {
+    ...home,
+    body: home.body
+      .replace(/<CS:getctag>[^<]*</, '<CS:getctag>"x"<')
+      .replace(/<sync-token>[^<]*</, '<sync-token>x<'),
+  });
+  const list = SESSION.find(
+    (e) => e.method === 'PROPFIND' && e.url === `${SERVER}/alice/contacts/`,
+  );
+  server.overrides.set(`PROPFIND ${SERVER}/alice/contacts/ 1`, {
+    ...list,
+    body: list.body.replaceAll(/<getetag>"[^"]*"/g, '<getetag>"other"'),
+  });
+  server.overrides.set(`REPORT ${SERVER}/alice/contacts/ 1`, {
+    status: 207,
+    headers: {},
+    body: '<?xml version="1.0"?><multistatus xmlns="DAV:"></multistatus>',
+  });
+  const second = await source.load('alice', account);
+  const sorted = (list) => list.map((e) => `${e.kind}:${e.key}`).sort();
+  assert.deepEqual(sorted(second.entries), sorted(first.entries));
+  assert.equal(source.cache.get('alice').books.get(`${SERVER}/alice/contacts/`).ctag, null);
+});

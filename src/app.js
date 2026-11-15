@@ -87,7 +87,9 @@ export function registerHandlers(gladys, deps = {}) {
       const result = await fn();
       // Per-user reading errors are logged by the syncer, once per change.
       if (result.failures.length > 0) {
-        logger.debug(`${label}: ${result.failures.join('; ')}`);
+        logger.debug(`${label}: ${result.failures.map((failure) => failure.text).join('; ')}`);
+      }
+      if (result.failures.some((failure) => failure.retry)) {
         scheduleRetry(label);
       } else {
         clearTimeout(retryTimer);
@@ -138,6 +140,11 @@ export function registerHandlers(gladys, deps = {}) {
     const start = Number(config.notify_hour) * 60;
     const minutes = minutesOfDay(t);
     if (state.reminded === today || minutes < start) {
+      return 0;
+    }
+    // Contacts not read yet (server down at start-up): wait for the retries,
+    // within the grace period.
+    if (syncer.waitingForContacts() && minutes < start + REMINDER_GRACE_MINUTES) {
       return 0;
     }
     state = { ...state, reminded: today };
